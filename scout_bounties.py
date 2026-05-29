@@ -11,10 +11,25 @@ MAX_COMMENTS = 25 # Filter out overcrowded threads
 
 # GitHub search queries for active bounty opportunities
 SEARCH_QUERIES = [
-    'is:issue is:open bounty in:title,body sort:updated-desc',
-    'is:issue is:open reward bounty sort:updated-desc',
-    'is:issue is:open "paid" "PR" "bounty" sort:updated-desc',
-    'is:issue is:open "Opire" bounty sort:updated-desc',
+    'is:issue is:open "bounty $" in:title,body sort:updated-desc',
+    'is:issue is:open "bounty:" in:title,body sort:updated-desc',
+    'is:issue is:open "reward:" "bounty" in:title,body sort:updated-desc',
+    'is:issue is:open label:bounty sort:updated-desc',
+    'is:issue is:open "Opire" in:title,body sort:updated-desc',
+]
+
+BOUNTY_LABEL_TERMS = ("bounty", "reward", "paid")
+BOUNTY_PLATFORM_TERMS = (
+    "algora",
+    "bountysource",
+    "gitpay",
+    "issuehunt",
+    "opire",
+    "polar.sh",
+)
+PAYOUT_PATTERNS = [
+    r"(?<!\w)\$\s?\d[\d,]*(?:\.\d{1,2})?\s?(?:k|m)?\b",
+    r"\b\d[\d,]*(?:\.\d{1,2})?\s?(?:usd|usdc|eur|gbp)\b",
 ]
 
 def load_seen_bounties():
@@ -56,6 +71,34 @@ def search_github(query, token=None):
         print(f"GitHub Search API Error for query '{query}': {e}")
         return {}
 
+def pluralize_opportunity(count):
+    """Return the correctly pluralized opportunity noun."""
+    return "opportunity" if count == 1 else "opportunities"
+
+def label_names(item):
+    """Extract normalized label names from a GitHub issue search item."""
+    names = []
+    for label in item.get("labels", []):
+        if isinstance(label, dict):
+            names.append(str(label.get("name", "")).lower())
+        else:
+            names.append(str(label).lower())
+    return names
+
+def has_bounty_signal(item):
+    """Require concrete bounty intent instead of accepting broad keyword matches."""
+    title = str(item.get("title", ""))
+    body = str(item.get("body", ""))
+    combined = f"{title}\n{body}".lower()
+
+    if any(term in label for label in label_names(item) for term in BOUNTY_LABEL_TERMS):
+        return True
+
+    if any(term in combined for term in BOUNTY_PLATFORM_TERMS):
+        return True
+
+    return any(re.search(pattern, combined, flags=re.IGNORECASE) for pattern in PAYOUT_PATTERNS)
+
 def is_clean_candidate(item):
     """Triage logic to filter out noisy, assigned, closed, or spam tasks."""
     # 1. Skip if already a Pull Request
@@ -77,6 +120,12 @@ def is_clean_candidate(item):
         "blog post", "article writing", "tutorial proposal", "content creator"
     ]
     if any(term in title or term in body for term in blocklist):
+        return False
+
+    # 5. Require explicit bounty evidence such as a payout, bounty label, or
+    # recognized bounty platform. This prevents generic "bounty" mentions from
+    # becoming repository issues.
+    if not has_bounty_signal(item):
         return False
         
     return True
@@ -187,7 +236,7 @@ def main():
     # 1. Telegram / Discord Message Format (Markdown)
     notif_lines = [
         f"🎯 *New Bounty Alert* ({now_str})",
-        f"Found {len(new_bounties)} new opportunity{'ies' if len(new_bounties) > 1 else ''}:\n"
+        f"Found {len(new_bounties)} new {pluralize_opportunity(len(new_bounties))}:\n"
     ]
     for idx, b in enumerate(new_bounties, start=1):
         notif_lines.append(f"{idx}. *{b['title']}*")
@@ -211,7 +260,7 @@ def main():
 
     # Method C: GitHub Issue (Built-in, zero configuration)
     if github_token and repo_fullname:
-        issue_title = f"🎯 Bounty Alert: {len(new_bounties)} New Opportunity{'ies' if len(new_bounties) > 1 else ''} found"
+        issue_title = f"🎯 Bounty Alert: {len(new_bounties)} New {pluralize_opportunity(len(new_bounties)).title()} found"
         issue_body = (
             f"### Active Bounty Scan Results\n\n"
             f"**Scan Time:** {now_str}\n\n"

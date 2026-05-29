@@ -1,6 +1,6 @@
 # 🎯 Bounty Scout: Hourly Notification System
 
-A lightweight, state-tracking GitHub bounty scanner that runs **hourly**, searches for new open bounties, filters out competitive/crypto spam, and alerts you instantly.
+A lightweight, state-tracking GitHub bounty scanner that runs **hourly**, searches for new open bounties, filters out weak matches and competitive/crypto spam, and alerts you instantly.
 
 Since it tracks seen bounty URLs, **it will only notify you once per bounty** (no spam).
 
@@ -9,8 +9,8 @@ Since it tracks seen bounty URLs, **it will only notify you once per bounty** (n
 ## 🚀 How It Works
 
 1. **GitHub Action Scheduled Trigger:** Runs automatically at minute `0` of every hour.
-2. **Scouts GitHub:** Queries active bounty search keywords using the GitHub Search API.
-3. **Triages Candidates:** Skips pull requests, already-assigned issues, overcrowded threads (>25 comments), and crypto-related spam.
+2. **Scouts GitHub:** Queries targeted bounty phrases, bounty labels, and known bounty platforms using the GitHub Search API.
+3. **Triages Candidates:** Skips pull requests, already-assigned issues, overcrowded threads (>25 comments), crypto-related spam, and generic bounty mentions without a payout, bounty label, or known bounty platform signal.
 4. **State Machine Comparison:** Composed against `seen_bounties.json` to extract strictly **new** opportunities.
 5. **Instant Notifications:** Dispatches updates through your preferred channel (GitHub Issues, Telegram, or Discord).
 6. **Persists State:** Saves the updated seen list back to the repository so you don't receive duplicate alerts on the next run.
@@ -67,5 +67,10 @@ You can test the setup immediately without waiting for the next hour:
 2. Click on the **Actions** tab.
 3. Select **Scout Active Bounties Hourly** from the sidebar.
 4. Click the **Run workflow** dropdown and select **Run workflow**.
+
+## Local Tests
+```bash
+python -m unittest
+```
 
 Happy bounty hunting! 🚀
