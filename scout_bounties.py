@@ -81,6 +81,12 @@ def is_clean_candidate(item):
         
     return True
 
+def pluralize(count, singular, plural=None):
+    """Return the singular or plural form for a count."""
+    if count == 1:
+        return singular
+    return plural or f"{singular}s"
+
 def send_telegram_notification(token, chat_id, message):
     """Send a notification message via Telegram Bot API."""
     url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -187,7 +193,7 @@ def main():
     # 1. Telegram / Discord Message Format (Markdown)
     notif_lines = [
         f"🎯 *New Bounty Alert* ({now_str})",
-        f"Found {len(new_bounties)} new opportunity{'ies' if len(new_bounties) > 1 else ''}:\n"
+        f"Found {len(new_bounties)} new {pluralize(len(new_bounties), 'opportunity', 'opportunities')}:\n"
     ]
     for idx, b in enumerate(new_bounties, start=1):
         notif_lines.append(f"{idx}. *{b['title']}*")
@@ -211,7 +217,7 @@ def main():
 
     # Method C: GitHub Issue (Built-in, zero configuration)
     if github_token and repo_fullname:
-        issue_title = f"🎯 Bounty Alert: {len(new_bounties)} New Opportunity{'ies' if len(new_bounties) > 1 else ''} found"
+        issue_title = f"🎯 Bounty Alert: {len(new_bounties)} New {pluralize(len(new_bounties), 'Opportunity', 'Opportunities')} found"
         issue_body = (
             f"### Active Bounty Scan Results\n\n"
             f"**Scan Time:** {now_str}\n\n"
