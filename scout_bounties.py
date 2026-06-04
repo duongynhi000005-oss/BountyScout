@@ -84,6 +84,126 @@ def is_clean_candidate(item):
 def send_telegram_notification(token, chat_id, message):
     """Send a notification message via Telegram Bot API."""
     url = f"https://api.telegram.org/bot{token}/sendMessage"
+    data = urllib.parse.urlencode({
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "Markdown",
+        "disable_web_page_preview": True
+    }).encode("utf-8")
+    
+    req = urllib.request.Request(url, data=data, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return response.status == 200
+    except Exception as e:
+        print(f"Telegram notification error: {e}")
+        return False
+
+def create_github_issue(token, repo, title, body):
+    """Create a GitHub issue in the specified repository."""
+    owner, repo_name = repo.split("/")
+    url = f"https://api.github.com/repos/{owner}/{repo_name}/issues"
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {token}",
+        "User-Agent": "BountyScout",
+        "X-GitHub-Api-Version": "2022-11-28"
+    }
+    
+    payload = json.dumps({
+        "title": title,
+        "body": body,
+        "labels": ["bounty-alert"]
+    }).encode("utf-8")
+    
+    req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            return response.status == 201
+    except Exception as e:
+        print(f"GitHub issue creation error: {e}")
+        return False
+
+def main():
+    """Main execution: scout bounties and notify about new ones."""
+    seen_urls = load_seen_bounties()
+    all_new_bounties = []
+    
+    github_token = os.environ.get("GITHUB_TOKEN")
+    
+    for query in SEARCH_QUERIES:
+        results = search_github(query, github_token)
+        items = results.get("items", [])
+        
+        for item in items:
+            if not is_clean_candidate(item):
+                continue
+                
+            issue_url = item.get("html_url", "")
+            if issue_url and issue_url not in seen_urls:
+                all_new_bounties.append(item)
+                seen_urls.add(issue_url)
+    
+    if not all_new_bounties:
+        print("No new bounties found.")
+        return
+    
+    # Build notification message
+    count = len(all_new_bounties)
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    
+    title = f"🎯 Bounty Alert: {count} New Opportunities found"
+    body = f"### Active Bounty Scan Results\n\n**Scan Time:** {timestamp}\n\n"
+    
+    for idx, bounty in enumerate(all_new_bounties, 1):
+        issue_title = bounty.get("title", "Untitled")
+        issue_url = bounty.get("html_url", "")
+        repo_url = bounty.get("repository_url", "").replace("https://api.github.com/repos/", "https://github.com/")
+        repo_name = "/".join(repo_url.split("/")[-2:]) if repo_url else "Unknown"
+        comments = bounty.get("comments", 0)
+        updated = bounty.get("updated_at", "")
+        
+        body += f"#### {idx}. [{issue_title}]({issue_url})\n"
+        body += f"- **Repository:** [{repo_name}]({repo_url})\n"
+        body += f"- **Comments:** {comments}\n"
+        body += f"- **Last Updated:** {updated}\n\n"
+    
+    print(f"Found {count} new bounties!")
+    
+    # Send notifications
+    telegram_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    telegram_chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    
+    if telegram_token and telegram_chat_id:
+        send_telegram_notification(telegram_token, telegram_chat_id, f"{title}\n\n{body}")
+    
+    # Create GitHub issue
+    repo = os.environ.get("GITHUB_REPOSITORY")
+    if repo and github_token:
+        create_github_issue(github_token, repo, title, body)
+    
+    # Save updated state
+    save_seen_bounties(seen_urls)
+    print("State saved successfully.")
+
+if __name__ == "__main__":
+    main()
+
+Wait, let me check the actual file content more carefully since it's truncated:
+
+<tool_calls>
+<invoke name="Bash">
+<command>wc -l scout_bounties.py</command>
+</invoke>
+</tool_calls>
+
+<tool_calls>
+<invoke name="Bash">
+<command>tail -100 scout_bounties.py</command>
+</invoke>
+</tool_calls>
+
+Now I can see the actual bug location:oken}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": message,
